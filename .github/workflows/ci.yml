@@ -1,0 +1,80 @@
+name: CI
+
+# Gates on every push to main and every PR:
+#   1. editor pass  — headless editor run builds the global class_name cache
+#      (addon + fixture + gdUnit4 classes) and surfaces parse/import errors
+#   2. unit tests   — the gdUnit4 suite under test/unit. gdUnit4 exit codes:
+#      100 = errors/failures, 101 = orphan nodes (both fail). Zero collected
+#      tests also fails — 0 tests is never a pass (repo rule).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: "4.6"
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Cache the extracted binary keyed by version so a re-run skips the download.
+      - name: Cache Godot binary
+        id: cache-godot
+        uses: actions/cache@v4
+        with:
+          path: ~/godot-bin
+          key: godot-${{ env.GODOT_VERSION }}-stable-linux
+
+      - name: Install Godot ${{ env.GODOT_VERSION }}
+        if: steps.cache-godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          BASE="Godot_v${GODOT_VERSION}-stable_linux.x86_64"
+          URL="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/${BASE}.zip"
+          mkdir -p ~/godot-bin
+          curl -fsSL "$URL" -o /tmp/godot.zip
+          unzip -o /tmp/godot.zip -d ~/godot-bin
+          mv ~/godot-bin/${BASE} ~/godot-bin/godot
+          chmod +x ~/godot-bin/godot
+
+      - name: Add Godot to PATH
+        run: echo "$HOME/godot-bin" >> "$GITHUB_PATH"
+
+      # Same flow verified locally: the editor pass builds the class_name cache
+      # that headless runs need (HostTerrainReference, the vendored fixture's
+      # HexGrid/HexCell/PathFinder, and gdUnit4 itself).
+      - name: Editor pass (parse errors + class cache)
+        run: |
+          set -euo pipefail
+          godot --headless --editor --quit > /tmp/editor.log 2>&1 || true
+          if grep -qE "SCRIPT ERROR|Parse Error" /tmp/editor.log; then
+            echo "::error::script parse errors during the editor pass"
+            tail -40 /tmp/editor.log
+            exit 1
+          fi
+
+      - name: Unit tests (gdUnit4)
+        run: |
+          set -euo pipefail
+          godot --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
+              -a res://test/unit --ignoreHeadlessMode -c > /tmp/gdunit.log 2>&1 \
+            || { tail -30 /tmp/gdunit.log; \
+                 echo "::error::gdUnit4 exited non-zero (100=failures, 101=orphans)"; exit 1; }
+          # Strip ANSI colors before parsing the summary line.
+          sed 's/\x1b\[[0-9;]*m//g' /tmp/gdunit.log > /tmp/gdunit.clean
+          tests="$(grep -oP 'Overall Summary: \K[0-9]+' /tmp/gdunit.clean | head -1)"
+          if [ -z "$tests" ] || [ "$tests" -eq 0 ]; then
+            echo "::error::gdUnit4 collected 0 tests — test collection is broken"
+            exit 1
+          fi
+          if grep -qE "Failed to load script|SCRIPT ERROR" /tmp/gdunit.log; then
+            echo "::error::at least one test script failed to load/parse"
+            exit 1
+          fi
+          echo "gdUnit4 ran ${tests} tests"

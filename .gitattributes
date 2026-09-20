@@ -1,0 +1,17 @@
+# La distribución oficial se arma con pack.sh (AGPL + commercial, mismo código).
+# El "Download ZIP" desde GitHub no debe entregar un paquete usable: se excluye
+# todo lo que no es el addon en sí.
+.gitattributes export-ignore
+.gitignore export-ignore
+.github/ export-ignore
+test/ export-ignore
+addons/gdUnit4/ export-ignore
+addons/hex_strategy_map/ export-ignore
+README.md export-ignore
+LICENSE export-ignore
+LICENSE_COMMERCIAL.md export-ignore
+llms.txt export-ignore
+pack.sh export-ignore
+project.godot export-ignore
+icon.svg export-ignore
+icon.svg.import export-ignore

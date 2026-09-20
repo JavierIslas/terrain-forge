@@ -1,0 +1,45 @@
+# Godot editor cache
+.godot/
+*.import
+
+# Godot export
+export_presets.cfg
+
+# Claude Code
+.claude/
+CLAUDE.md
+
+# Generated reports
+reports/
+
+# Generated output (SEO/GEO assets)
+output/
+
+# Packaging
+dist/
+dist.zip
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# Godot 4.x build artifacts
+*.gdextension
+
+# Godot 4.x uid files (auto-generated). Ignored everywhere EXCEPT the published
+# terrain_forge addon: the Godot AssetLib requires the .uid files to ship with it.
+# The hex_strategy_map fixture's uids stay ignored (it is not distributed).
+*.gd.uid
+!addons/terrain_forge/**/*.gd.uid
+
+# HTML docs generados
+*.html
