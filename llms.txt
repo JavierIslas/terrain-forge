@@ -1,0 +1,34 @@
+# Terrain Forge
+
+Procedural terrain generation for **Godot 4.6 / GDScript** with pluggable grid
+topology: **squares** (built-in, no dependencies), **hexagons** (via the FREE
+tier of Hex Strategy Map), or any custom topology via the `GridTopology` port.
+
+> **Core idea:** generation is a pipeline of injectable stages over a topology
+> port. Nothing consumes Godot's global RNG — same seed, same map, bit-for-bit,
+> in-editor or on a server.
+
+## Overview
+
+Terrain Forge extracts terrain generation into its own product. On hex it keeps
+bit-for-bit parity with Hex Strategy Map's `MapGenerator` (test-frozen), so
+migrating a game changes which function creates the grid — not the map. Beyond
+parity it adds what the host never had: fBm control, domain warping, island
+falloff, majority-vote smoothing, spaced rivers and locations, connectivity
+repair, presets, and serializable snapshots.
+
+## Key APIs
+
+- `TerrainForge.generate(topology, params)` / `generate_with_report(...)` —
+  pipeline entry points; `params.stages` accepts built-in names and custom
+  `Callable`s.
+- `SquareGrid` / `SquareTopology` — host-free square stack.
+- `HexTopology.generate_hex(w, h, params)` / `apply(grid, params)` — produces
+  or regenerates a real `HexGrid` through the host's public API.
+- `GridTopology` — extend ~16 virtuals to support any topology.
+
+## License
+
+Dual-licensed: GNU AGPL v3.0 by default (`LICENSE`); a commercial license
+exempting closed-source (including server-side) use is available
+(`LICENSE_COMMERCIAL.md`, islasjavieralf@gmail.com).
