@@ -115,6 +115,10 @@ Every push to `main` and every pull request runs an editor pass (parse errors
 + class cache) and the full gdUnit4 suite on Godot 4.6 headless, failing on
 zero collected tests (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
+A scheduled job also runs weekly to watch the vendored hex fixture for
+upstream drift, opening an issue when the published host diverges from the
+pinned copies (see [`.github/workflows/drift.yml`](.github/workflows/drift.yml)).
+
 ## License
 
 Terrain Forge is **dual-licensed**:

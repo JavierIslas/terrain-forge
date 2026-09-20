@@ -1,0 +1,94 @@
+name: Fixture drift
+
+# Watches the vendored host fixture (addons/hex_strategy_map/, pin documented
+# in VENDORED.md). Runs weekly and on demand: downloads the 4 FREE-tier files
+# from the host's public repo (JavierIslas/hex-strategy-map-free, main = the
+# release/free branch its pack.sh publishes) and compares them with the local
+# copies.
+#   - Files differ   → the job fails and opens an issue (deduped by title):
+#                      the hex parity/compat contracts must be re-verified
+#                      against the new host before updating the pin.
+#   - Upstream gone  → also fails: the pin can no longer be verified.
+on:
+  schedule:
+    - cron: "23 4 * * 1" # Mondays 04:23 UTC (off the :00 mark)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare vendored fixture vs published host
+        env:
+          UPSTREAM: https://raw.githubusercontent.com/JavierIslas/hex-strategy-map-free/main/addons/hex_strategy_map
+        run: |
+          set -euo pipefail
+          touch /tmp/drift_report.md
+          drift=0
+          unreachable=0
+          for f in hex_grid.gd hex_cell.gd fog_state.gd path_finder.gd; do
+            code=$(curl -sL -o "/tmp/${f}" -w '%{http_code}' "${UPSTREAM}/${f}")
+            if [ "$code" != "200" ]; then
+              echo "::warning::upstream ${f} returned HTTP ${code}"
+              echo "- \`${f}\`: upstream unreachable (HTTP ${code}) — the pin can no longer be verified" >> /tmp/drift_report.md
+              unreachable=1
+              continue
+            fi
+            if ! diff -u "addons/hex_strategy_map/${f}" "/tmp/${f}" > "/tmp/diff_${f}.txt"; then
+              echo "::error::${f} drifted from the published host"
+              cat "/tmp/diff_${f}.txt"
+              echo "- \`${f}\`: **drifted** (see the job log for the full diff)" >> /tmp/drift_report.md
+              drift=1
+            else
+              echo "OK: ${f} identical to the published host"
+              echo "- \`${f}\`: identical" >> /tmp/drift_report.md
+            fi
+          done
+          if [ "$drift" = "1" ] || [ "$unreachable" = "1" ]; then
+            exit 1
+          fi
+
+      - name: Open drift issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          title="Fixture drift: the published host differs from the vendored pin"
+          existing=$(gh issue list --state open --json number,title \
+            --jq ".[] | select(.title == \"${title}\") | .number")
+          if [ -n "$existing" ]; then
+            echo "An open drift issue already exists (#${existing}) — not duplicating."
+            exit 0
+          fi
+          {
+            cat << 'BODY'
+          The weekly drift job found that the vendored host fixture
+          (`addons/hex_strategy_map/`, pin in `VENDORED.md`) no longer matches
+          the published host (`JavierIslas/hex-strategy-map-free@main`).
+
+          Per-file status:
+          BODY
+            cat /tmp/drift_report.md
+            cat << 'BODY'
+
+          ## What to do
+
+          1. Review the diffs in the job log.
+          2. If the host change is intentional: copy the updated files into the
+             fixture, update the pin in `addons/hex_strategy_map/VENDORED.md`,
+             run the full test suite and push.
+          3. If it breaks compatibility: also review
+             `test/helpers/host_terrain_reference.gd` (frozen parity algorithm)
+             and `hex_topology.gd` (the public host API it uses).
+          BODY
+          } > /tmp/issue_body.md
+          gh issue create --title "$title" --body-file /tmp/issue_body.md

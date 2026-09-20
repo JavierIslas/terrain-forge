@@ -18,4 +18,11 @@ parity is frozen against an embedded reference instead: see
 
 **For production hex maps** install the real addon (the FREE tier is enough):
 Godot Asset Library → *Hex Strategy Map*. To refresh this fixture, copy the
-four files again from the upstream repo and re-run the test suite.
+four files again from the upstream repo, update the pin above, and re-run the
+test suite.
+
+**Drift watch:** a scheduled CI job (`.github/workflows/drift.yml`, weekly)
+compares these four files against the published host
+(`JavierIslas/hex-strategy-map-free@main`). If they drift, the job fails and
+opens an issue — the parity/compat contracts must be re-verified against the
+new host before the pin is moved.
