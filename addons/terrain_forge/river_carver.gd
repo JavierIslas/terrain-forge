@@ -24,13 +24,16 @@ const RIVER_SPACING_DEFAULT := 3
 const RIVER_COUNT_DEFAULT := 3
 const RIVER_LENGTH_MIN := 4
 const RIVER_LENGTH_MAX := 10
+const RIVER_WIDTH_DEFAULT := 1
 
 
 ## Talla [param river_count] ríos y materializa edges RIVER entre celdas
 ## consecutivas de cada camino. Retorna Array de Array[Vector2i] (los caminos,
 ## para reporte/snapshot; no tipable anidado en GDScript).
 ## params: "river_count" (3), "river_spacing" (3), "river_length_min" (4),
-## "river_length_max" (10), "river_downhill_bias" (0.0), "river_straightness" (0.0).
+## "river_length_max" (10), "river_downhill_bias" (0.0), "river_straightness"
+## (0.0), "river_water" (false: convertir el cauce a terreno WATER),
+## "river_width" (1: anillos de vecinos alrededor del cauce; clamp mínimo 1).
 static func carve(topology: GridTopology, rng: SeededRng, params: Dictionary = {}) -> Array:
 	var paths: Array = []
 	for start in _pick_starts(topology, rng, params):
@@ -41,6 +44,8 @@ static func carve(topology: GridTopology, rng: SeededRng, params: Dictionary = {
 		for j in path.size() - 1:
 			topology.set_edge(path[j], path[j + 1], SquareGrid.EdgeType.RIVER)
 		if path.size() >= 2:
+			if bool(params.get("river_water", false)):
+				_water_path(topology, path, int(params.get("river_width", RIVER_WIDTH_DEFAULT)))
 			paths.append(path)
 	return paths
 
@@ -127,3 +132,28 @@ static func _far_enough(topology: GridTopology, coord: Vector2i, chosen: Array[V
 		if topology.distance(coord, other) < spacing:
 			return false
 	return true
+
+
+## Convierte el cauce (y "width - 1" anillos de vecinos alrededor) a terreno
+## WATER. Expansión BFS por anillos en orden fijo (celdas del camino, luego
+## get_neighbors de cada celda del anillo) → determinista. Los edges RIVER
+## quedan solo en la línea central; las elevaciones no se tocan.
+static func _water_path(topology: GridTopology, path: Array, width: int) -> void:
+	var seen := {}
+	for coord in path:
+		seen[coord] = true
+	var ring: Array = path.duplicate()
+	var to_water: Array = path.duplicate()
+	for _i in maxi(width, 1) - 1:
+		var next: Array = []
+		for coord in ring:
+			for neighbor in topology.get_neighbors(coord):
+				if topology.is_valid(neighbor) and not seen.has(neighbor):
+					seen[neighbor] = true
+					next.append(neighbor)
+		if next.is_empty():
+			break
+		ring = next
+		to_water.append_array(next)
+	for coord in to_water:
+		topology.set_terrain(coord, MapCell.Terrain.WATER)

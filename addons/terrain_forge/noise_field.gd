@@ -28,7 +28,10 @@ var _noise := FastNoiseLite.new()
 
 ## Fábrica con configuración desde params:
 ## "noise_type" (int), "frequency" (0.08), "octaves" (5), "fractal_gain" (0.5),
-## "lacunarity" (2.0), "domain_warp" (0.0 = desactivado; > 0 lo activa con esa
+## "lacunarity" (2.0), "fractal_type" (FastNoiseLite.FRACTAL_FBM — setearlo
+## explícito al default implícito del anfitrión preserva la paridad bit a bit;
+## FRACTAL_RIDGED genera cadenas montañosas, FRACTAL_PING_PONG terreno retorcido),
+## "domain_warp" (0.0 = desactivado; > 0 lo activa con esa
 ## amplitud), "domain_warp_frequency" (0.05).
 static func create(seed_value: int, params: Dictionary = {}) -> NoiseField:
 	var field := NoiseField.new()
@@ -59,6 +62,7 @@ func _configure(seed_value: int, params: Dictionary) -> void:
 	_noise.seed = seed_value
 	_noise.noise_type = params.get("noise_type", FastNoiseLite.TYPE_SIMPLEX_SMOOTH)
 	_noise.frequency = params.get("frequency", 0.08)
+	_noise.fractal_type = params.get("fractal_type", FastNoiseLite.FRACTAL_FBM)
 	_noise.fractal_octaves = params.get("octaves", 5)
 	_noise.fractal_gain = params.get("fractal_gain", 0.5)
 	_noise.fractal_lacunarity = params.get("lacunarity", 2.0)

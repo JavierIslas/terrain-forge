@@ -44,3 +44,21 @@ func test_domain_warp_cambia_el_resultado_sin_romper_determinismo() -> void:
 	var warped_b := NoiseField.create(5, {"domain_warp": 40.0})
 	assert_float(warped.sample_at(Vector2i(3, 3), 8, 8)).is_not_equal(plain.sample_at(Vector2i(3, 3), 8, 8))
 	assert_float(warped.sample_at(Vector2i(3, 3), 8, 8)).is_equal(warped_b.sample_at(Vector2i(3, 3), 8, 8))
+
+
+func test_fractal_type_fbm_explicito_es_identico_al_default() -> void:
+	## Setear FRACTAL_FBM explícito debe dejar el estado del noise idéntico al
+	## default implícito del anfitrión (paridad bit a bit intacta).
+	var plain := NoiseField.create(42)
+	var fbm := NoiseField.create(42, {"fractal_type": FastNoiseLite.FRACTAL_FBM})
+	for y in 5:
+		for x in 7:
+			assert_float(fbm.sample_at(Vector2i(x, y), 7, 5)).is_equal(plain.sample_at(Vector2i(x, y), 7, 5))
+
+
+func test_fractal_type_ridged_cambia_salida_y_es_determinista() -> void:
+	var ridged := NoiseField.create(42, {"fractal_type": FastNoiseLite.FRACTAL_RIDGED})
+	var ridged_b := NoiseField.create(42, {"fractal_type": FastNoiseLite.FRACTAL_RIDGED})
+	var plain := NoiseField.create(42)
+	assert_float(ridged.sample_at(Vector2i(3, 3), 8, 8)).is_not_equal(plain.sample_at(Vector2i(3, 3), 8, 8))
+	assert_float(ridged.sample_at(Vector2i(3, 3), 8, 8)).is_equal(ridged_b.sample_at(Vector2i(3, 3), 8, 8))

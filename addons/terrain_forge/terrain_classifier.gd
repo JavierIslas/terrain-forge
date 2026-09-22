@@ -21,7 +21,7 @@ extends RefCounted
 
 ## Escalera de 5 bandas sobre [param value]:
 ## < water_level → WATER; > mountain_level → MOUNTAIN; > forest_level → FOREST;
-## > 0.0 → ROAD; resto → PLAINS.
+## > road_level (default 0.0 = literal del anfitrión) → ROAD; resto → PLAINS.
 ## classify_fn del perfil, si es válido, reemplaza la escalera con firma
 ## (value: float, moisture: float) -> int (moisture 0.0 si no se sampleó).
 static func classify_value(value: float, profile: BiomeProfile, moisture: float = 0.0) -> int:
@@ -33,7 +33,7 @@ static func classify_value(value: float, profile: BiomeProfile, moisture: float 
 		return MapCell.Terrain.MOUNTAIN
 	if value > profile.forest_level:
 		return MapCell.Terrain.FOREST
-	if value > 0.0:
+	if value > profile.road_level:
 		return MapCell.Terrain.ROAD
 	return MapCell.Terrain.PLAINS
 

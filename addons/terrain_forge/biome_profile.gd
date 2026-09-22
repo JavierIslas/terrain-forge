@@ -21,6 +21,9 @@ extends RefCounted
 var water_level: float = -0.2
 var forest_level: float = 0.1
 var mountain_level: float = 0.4
+## Umbral inferior de la banda ROAD. Default 0.0 = el literal del anfitrión
+## (paridad bit a bit); subirlo estrecha la banda hacia forest_level.
+var road_level: float = 0.0
 var elevation_scale: float = 10.0
 ## Clasificador custom: (value: float, moisture: float) -> int (terreno).
 ## Si es válido, reemplaza la escalera de umbrales por completo.
@@ -57,13 +60,15 @@ static func create_highlands() -> BiomeProfile:
 
 
 ## Lee el perfil desde params: "water_level", "forest_level",
-## "mountain_level", "elevation_scale", "classify_fn", "biome" (String:
-## "ladder" | "continent" | "archipelago" | "highlands"; default "ladder").
+## "mountain_level", "road_level", "elevation_scale", "classify_fn", "biome"
+## (String: "ladder" | "continent" | "archipelago" | "highlands"; default
+## "ladder").
 static func from_params(params: Dictionary) -> BiomeProfile:
 	var profile := _preset(str(params.get("biome", "ladder")))
 	profile.water_level = float(params.get("water_level", profile.water_level))
 	profile.forest_level = float(params.get("forest_level", profile.forest_level))
 	profile.mountain_level = float(params.get("mountain_level", profile.mountain_level))
+	profile.road_level = float(params.get("road_level", profile.road_level))
 	profile.elevation_scale = float(params.get("elevation_scale", profile.elevation_scale))
 	profile.classify_fn = params.get("classify_fn", Callable())
 	return profile

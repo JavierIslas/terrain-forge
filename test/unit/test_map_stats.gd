@@ -51,6 +51,52 @@ func test_snapshot_remateraliza_estado_completo() -> void:
 	assert_int(restored_locations).is_equal(4)
 
 
+func test_snapshot_remateraliza_rio_con_agua() -> void:
+	## river_water muta terreno (cauce WATER): terrain_classes ya lo captura,
+	## así que el round-trip restaura el mapa con ríos de agua sin keys extra.
+	var original := _make_topology(14, 10)
+	var params := {"seed": 42, "river_count": 3, "river_water": true, "river_width": 2}
+	var report := TerrainForge.generate_with_report(original, params)
+
+	var restored := _make_topology(14, 10)
+	TerrainForge.apply_snapshot(restored, report.snapshot)
+
+	for coord in original.get_all_coords():
+		assert_int(restored.get_terrain(coord)).is_equal(original.get_terrain(coord))
+	assert_int(restored.edge_count()).is_equal(original.edge_count())
+
+
+func test_snapshot_remateraliza_roads() -> void:
+	## Los edges ROAD viajan en el snapshot (road_paths) y el terreno ROAD ya
+	## viene en terrain_classes: el round-trip restaura el mapa con caminos.
+	var original := _make_topology(12, 9)
+	var params := {"seed": 42, "location_count": 4, "roads": true}
+	var report := TerrainForge.generate_with_report(original, params)
+	assert_int(report.road_paths.size()).is_greater_equal(1)
+
+	var restored := _make_topology(12, 9)
+	TerrainForge.apply_snapshot(restored, report.snapshot)
+
+	for coord in original.get_all_coords():
+		assert_int(restored.get_terrain(coord)).is_equal(original.get_terrain(coord))
+	assert_int(restored.edge_count()).is_equal(original.edge_count())
+	var path: Array = report.road_paths[0]
+	var edge: Dictionary = restored.grid.get_edge(path[0], path[1])
+	assert_int(edge.get("type", -1)).is_equal(SquareGrid.EdgeType.ROAD)
+
+
+func test_apply_snapshot_sin_road_paths_es_retrocompatible() -> void:
+	## Snapshots generados antes de que existiera la key deben aplicar sin error.
+	var original := _make_topology(8, 6)
+	var report := TerrainForge.generate_with_report(original, {"seed": 42})
+	var snap: Dictionary = report.snapshot.duplicate()
+	snap.erase("road_paths")
+	var restored := _make_topology(8, 6)
+	TerrainForge.apply_snapshot(restored, snap)
+	for coord in original.get_all_coords():
+		assert_int(restored.get_terrain(coord)).is_equal(original.get_terrain(coord))
+
+
 func test_snapshot_rechaza_dimensiones_distintas() -> void:
 	var original := _make_topology(10, 8)
 	var report := TerrainForge.generate_with_report(original, {"seed": 1})

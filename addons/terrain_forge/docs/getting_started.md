@@ -42,6 +42,10 @@ TerrainForge.generate(topo, params)
 # Guarantee a connected landmass
 TerrainForge.generate(topo, {"seed": 7, "connectivity_mode": "repair"})
 
+# Rivers made of real water (bed + width rings become WATER terrain)
+TerrainForge.generate(topo, {"seed": 7, "river_count": 4, "river_water": true,
+	"river_width": 2, "connectivity_mode": "repair"})
+
 # Biome rules via classify_fn (elevation × moisture)
 TerrainForge.generate(topo, {"seed": 7,
 	"classify_fn": func(value: float, moisture: float) -> int:

@@ -40,11 +40,13 @@ const STAGE_CLASSIFY := "classify"
 const STAGE_SMOOTH := "smooth"
 const STAGE_RIVERS := "rivers"
 const STAGE_LOCATIONS := "locations"
+const STAGE_ROADS := "roads"
 const STAGE_CONNECTIVITY := "connectivity"
 
 ## Pipeline por defecto (los ríos corren con river_count default; locations
-## son no-op salvo location_count > 0; conectividad reporta por defecto).
-const STAGES_DEFAULT: Array = [STAGE_ELEVATION, STAGE_MOISTURE, STAGE_FALLOFF, STAGE_CLASSIFY, STAGE_SMOOTH, STAGE_RIVERS, STAGE_LOCATIONS, STAGE_CONNECTIVITY]
+## son no-op salvo location_count > 0; roads es no-op salvo "roads": true;
+## conectividad reporta por defecto).
+const STAGES_DEFAULT: Array = [STAGE_ELEVATION, STAGE_MOISTURE, STAGE_FALLOFF, STAGE_CLASSIFY, STAGE_SMOOTH, STAGE_RIVERS, STAGE_LOCATIONS, STAGE_ROADS, STAGE_CONNECTIVITY]
 
 
 ## Genera sobre [param topology] con [param params] y retorna la topología
@@ -55,7 +57,8 @@ static func generate(topology: GridTopology, params: Dictionary = {}) -> GridTop
 
 
 ## Igual que generate() pero retorna el report del run (seed, stages_run,
-## stats, snapshot, river_paths, locations, connectivity, ...).
+## stats, snapshot, river_paths, locations, road_paths, road_bridges,
+## connectivity, ...).
 static func generate_with_report(topology: GridTopology, params: Dictionary = {}) -> Dictionary:
 	var ctx := _build_context(topology, params)
 	if topology.cell_count() == 0:
@@ -71,7 +74,8 @@ static func generate_with_report(topology: GridTopology, params: Dictionary = {}
 
 ## Re-materializa un snapshot (de report.snapshot) sobre cualquier topología
 ## con las MISMAS dimensiones. Estado final completo: terrenos (post
-## smoothing), elevación, ríos y locations (los RIVER previos se limpian).
+## smoothing), elevación, ríos, caminos y locations (los edges RIVER y ROAD
+## previos se limpian). Snapshots sin "road_paths" (pre-roads) aplican igual.
 ## Falla con push_error si las dimensiones no coinciden, sin tocar la topología.
 static func apply_snapshot(topology: GridTopology, snapshot: Dictionary) -> void:
 	if topology.get_dimensions() != Vector2i(snapshot.width, snapshot.height):
@@ -94,6 +98,10 @@ static func apply_snapshot(topology: GridTopology, snapshot: Dictionary) -> void
 	for path in snapshot.river_paths:
 		for j in path.size() - 1:
 			topology.set_edge(path[j], path[j + 1], SquareGrid.EdgeType.RIVER)
+	topology.clear_edges(SquareGrid.EdgeType.ROAD)
+	for path in snapshot.get("road_paths", []):
+		for j in path.size() - 1:
+			topology.set_edge(path[j], path[j + 1], SquareGrid.EdgeType.ROAD)
 	for coord in topology.get_all_coords():
 		topology.set_location(coord, 0)
 	for coord in snapshot.locations:
@@ -149,6 +157,8 @@ static func _run_stage(stage: Variant, topology: GridTopology, ctx: Dictionary) 
 			_stage_rivers(topology, ctx)
 		STAGE_LOCATIONS:
 			_stage_locations(topology, ctx)
+		STAGE_ROADS:
+			_stage_roads(topology, ctx)
 		STAGE_CONNECTIVITY:
 			_stage_connectivity(topology, ctx)
 		_:
@@ -237,10 +247,25 @@ static func _stage_locations(topology: GridTopology, ctx: Dictionary) -> void:
 	ctx.report.location_type = int(ctx.params.get("location_type", 1))
 
 
+## Caminos entre locations (MST + Dijkstra con penalización de agua; puentes
+## permitidos sobre celdas WATER que no se convierten). Opt-in "roads": true;
+## sin la key el stage no toca NADA — ni los ROAD edges colocados por el
+## juego (que este stage limpia al correr, como rivers con RIVER, para que
+## regenerar no deje caminos huérfanos del seed anterior). Determinista sin
+## rng: el trazado es función pura de (terreno, locations).
+static func _stage_roads(topology: GridTopology, ctx: Dictionary) -> void:
+	if ctx.params.get("roads", false) != true:
+		return
+	topology.clear_edges(SquareGrid.EdgeType.ROAD)
+	var result := RoadBuilder.build(topology, ctx.params, ctx.params.get("road_cost_fn", Callable()))
+	ctx.report.road_paths = result.road_paths
+	ctx.report.road_bridges = result.road_bridges
+
+
 ## Estado final serializable: clases de terreno POST-smoothing + alturas +
-## ríos + locations. Re-materializable con apply_snapshot() en cualquier
-## topología de las mismas dimensiones (hex o cuadrados). Las clases se
-## indexan SECUENCIALMENTE sobre get_all_coords() (soporta topologías no
+## ríos + caminos + locations. Re-materializable con apply_snapshot() en
+## cualquier topología de las mismas dimensiones (hex o cuadrados). Las clases
+## se indexan SECUENCIALMENTE sobre get_all_coords() (soporta topologías no
 ## rectangulares); las alturas mantienen el índice row-major del rectángulo.
 static func _build_snapshot(topology: GridTopology, ctx: Dictionary) -> Dictionary:
 	var classes := PackedInt32Array()
@@ -257,6 +282,7 @@ static func _build_snapshot(topology: GridTopology, ctx: Dictionary) -> Dictiona
 		"terrain_classes": classes,
 		"elevation_scale": (ctx.profile as BiomeProfile).elevation_scale,
 		"river_paths": ctx.report.get("river_paths", []),
+		"road_paths": ctx.report.get("road_paths", []),
 		"locations": ctx.report.get("locations", []),
 		"location_type": ctx.report.get("location_type", 1),
 	}

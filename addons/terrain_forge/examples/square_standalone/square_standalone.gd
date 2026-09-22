@@ -48,8 +48,10 @@ func _regenerate() -> void:
 		"island_falloff": 0.35,
 		"smoothing_passes": 1,
 		"river_count": 2,
+		"river_water": true,
 		"location_count": 3,
 		"location_spacing": 3,
+		"roads": true,
 	})
 	queue_redraw()
 

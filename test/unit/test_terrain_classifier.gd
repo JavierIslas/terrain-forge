@@ -103,6 +103,28 @@ func test_smoothing_cero_pasadas_no_cambia_nada() -> void:
 	assert_int(topo.get_terrain(Vector2i(0, 0))).is_equal(MapCell.Terrain.MOUNTAIN)
 
 
+func test_road_level_default_cero_mantiene_la_escalera() -> void:
+	## El umbral de la banda ROAD era el literal 0.0; con road_level default 0.0
+	## la comparación debe quedar idéntica (paridad bit a bit intacta).
+	var profile := BiomeProfile.from_params({})
+	assert_float(profile.road_level).is_equal(0.0)
+	assert_int(TerrainClassifier.classify_value(0.05, profile)).is_equal(MapCell.Terrain.ROAD)
+	assert_int(TerrainClassifier.classify_value(-0.05, profile)).is_equal(MapCell.Terrain.PLAINS)
+
+
+func test_road_level_sube_el_umbral_de_banda_road() -> void:
+	var profile := BiomeProfile.from_params({"road_level": 0.05})
+	assert_int(TerrainClassifier.classify_value(0.03, profile)).is_equal(MapCell.Terrain.PLAINS)
+	assert_int(TerrainClassifier.classify_value(0.07, profile)).is_equal(MapCell.Terrain.ROAD)
+
+
+func test_from_params_lee_road_level() -> void:
+	var profile := BiomeProfile.from_params({"road_level": 0.02})
+	assert_float(profile.road_level).is_equal(0.02)
+	var ladder := BiomeProfile.from_params({})
+	assert_float(ladder.road_level).is_equal(0.0)
+
+
 func test_smoothing_empate_conserva_terreno_actual() -> void:
 	## Esquina con vecindario de 3 celdas y tres terrenos distintos (1-1-1):
 	## empate triple → conserva el terreno actual.

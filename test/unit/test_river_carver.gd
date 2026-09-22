@@ -82,3 +82,53 @@ func test_carve_ignora_el_rng_global() -> void:
 	var topo := _make_topology(15, 15)
 	RiverCarver.carve(topo, SeededRng.new(2), {"river_count": 3})
 	assert_int(randi()).is_equal(expected)
+
+
+func test_carve_con_river_water_convierte_el_camino_a_agua() -> void:
+	var topo := _make_topology(20, 20)
+	var paths := RiverCarver.carve(topo, SeededRng.new(42), {"river_count": 3, "river_water": true})
+	assert_int(paths.size()).is_greater_equal(1)
+	for path in paths:
+		for coord in path:
+			assert_int(topo.get_terrain(coord)).is_equal(MapCell.Terrain.WATER)
+
+
+func test_carve_sin_river_water_no_cambia_terreno() -> void:
+	var topo := _make_topology(20, 20)
+	var antes := {}
+	for coord in topo.get_all_coords():
+		antes[coord] = topo.get_terrain(coord)
+	RiverCarver.carve(topo, SeededRng.new(42), {"river_count": 3})
+	for coord in topo.get_all_coords():
+		assert_int(topo.get_terrain(coord)).is_equal(antes[coord])
+
+
+func test_carve_con_river_width_expande_anillos_determinista() -> void:
+	## Width 2 = cauce + un anillo: toda celda a distancia topológica <= 1 del
+	## camino queda WATER; dos corridas con mismo seed producen el mismo mapa.
+	var topo_a := _make_topology(20, 20)
+	var topo_b := _make_topology(20, 20)
+	var params := {"river_count": 2, "river_water": true, "river_width": 2}
+	var paths_a := RiverCarver.carve(topo_a, SeededRng.new(5), params)
+	RiverCarver.carve(topo_b, SeededRng.new(5), params)
+	for path in paths_a:
+		for coord in path:
+			for neighbor in topo_a.get_neighbors(coord):
+				if topo_a.is_valid(neighbor):
+					assert_int(topo_a.get_terrain(neighbor)).is_equal(MapCell.Terrain.WATER)
+	for coord in topo_a.get_all_coords():
+		assert_int(topo_b.get_terrain(coord)).is_equal(topo_a.get_terrain(coord))
+
+
+func test_carve_river_width_minimo_es_uno() -> void:
+	## Width 0 o negativo se clampa a 1: solo el cauce, sin anillos.
+	var topo := _make_topology(20, 20)
+	var paths := RiverCarver.carve(topo, SeededRng.new(5), {"river_count": 2, "river_water": true, "river_width": 0})
+	var expected := 0
+	for path in paths:
+		expected += path.size()
+	var water := 0
+	for coord in topo.get_all_coords():
+		if topo.get_terrain(coord) == MapCell.Terrain.WATER:
+			water += 1
+	assert_int(water).is_equal(expected)

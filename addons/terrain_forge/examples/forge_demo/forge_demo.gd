@@ -32,6 +32,7 @@ const TERRAIN_COLORS := {
 var use_hex := true
 var seed_value := 42
 var falloff := 0.35
+var roads := true
 var square_grid: SquareGrid
 var hex_grid
 var stats_label: Label
@@ -81,6 +82,14 @@ func _build_ui() -> void:
 		_regenerate())
 	falloff_row.add_child(falloff_slider)
 
+	var roads_check := CheckBox.new()
+	roads_check.text = "Roads"
+	roads_check.button_pressed = roads
+	roads_check.toggled.connect(func(pressed: bool) -> void:
+		roads = pressed
+		_regenerate())
+	box.add_child(roads_check)
+
 	stats_label = Label.new()
 	box.add_child(stats_label)
 
@@ -93,6 +102,7 @@ func _regenerate() -> void:
 		"river_count": 3,
 		"location_count": 4,
 		"location_spacing": 2,
+		"roads": roads,
 	}
 	square_grid = null
 	hex_grid = null

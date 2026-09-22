@@ -30,12 +30,17 @@ asserts the global sequence is untouched.
   previous `RIVER` edges and locations before writing the new ones, so
   regenerating (via `HexTopology.apply` or a second `generate` over the same
   topology) with the same seed reproduces the exact same final state — no
-  accumulation, no orphan rivers. Edges of other types (ROAD/WALL placed by
-  your game) are preserved.
+  accumulation, no orphan rivers. The `roads` stage (only when `"roads":
+  true`) likewise clears previous `ROAD` edges before carving. Edges of
+  other types (ROAD/WALL placed by your game) are preserved as long as the
+  roads stage doesn't run; `apply_snapshot` re-materializes the full state
+  including the snapshot's `ROAD` edges.
 - Rivers/locations derive independent streams (`SALT_RIVERS = 7919`,
   `SALT_LOCATIONS = 104729` — the host's offsets). They are deterministic
   but intentionally **not** identical to the host's rivers (better starts:
-  high elevation + spacing; optional downhill bias).
+  high elevation + spacing; optional downhill bias). Roads use **no rng at
+  all**: the MST + Dijkstra trace is a pure function of (terrain, locations,
+  params) with `(cost, x, y)` tie-breaking.
 
 ## TerrainForge (engine, static)
 
@@ -49,7 +54,7 @@ static func apply_falloff(heights: PackedFloat32Array, w: int, h: int, strength:
 
 `report` contains: `seed`, `stages_run`, `stats` (`{cell_count, counts,
 ratios}`), `snapshot` (re-materializable state), `river_paths`, `locations`,
-`location_type`, `connectivity`.
+`location_type`, `road_paths`, `road_bridges`, `connectivity`.
 
 ### Stages
 
@@ -57,7 +62,7 @@ ratios}`), `snapshot` (re-materializable state), `river_paths`, `locations`,
 `Callable`s `(topology, ctx) -> void`. Default pipeline:
 
 ```
-elevation → moisture → falloff → classify → smooth → rivers → locations → connectivity
+elevation → moisture → falloff → classify → smooth → rivers → locations → roads → connectivity
 ```
 
 ### Params (all optional)
@@ -67,19 +72,28 @@ elevation → moisture → falloff → classify → smooth → rivers → locati
 | `seed` | `0` | Master seed (terrain parity with the host) |
 | `noise_type`, `frequency` | `SIMPLEX_SMOOTH`, `0.08` | FastNoiseLite sampling |
 | `octaves`, `fractal_gain`, `lacunarity` | `5`, `0.5`, `2.0` | fBm (host's implicit defaults) |
+| `fractal_type` | `FRACTAL_FBM` | `FRACTAL_RIDGED` for mountain chains, `FRACTAL_PING_PONG` for twisted terrain (explicit FBM = host parity) |
 | `domain_warp`, `domain_warp_frequency` | `0.0`, `0.05` | Amplitude > 0 enables native warp |
 | `island_falloff`, `island_falloff_power` | `0.0`, `2.0` | Radial falloff pushing edges to water |
 | `biome` | `"ladder"` | `"continent"` / `"archipelago"` / `"highlands"` |
 | `water_level`, `forest_level`, `mountain_level`, `elevation_scale` | `-0.2`, `0.1`, `0.4`, `10.0` | Ladder thresholds (host parity) |
+| `road_level` | `0.0` | ROAD band lower threshold (0.0 = host literal; raise it to shrink the band) |
 | `classify_fn` | — | `(value: float, moisture: float) -> int`, replaces the ladder |
 | `moisture_frequency` | `0.05` | Moisture noise (sampled when `classify_fn` is set) |
 | `smoothing_passes` | `0` | Majority-vote smoothing passes |
 | `river_count`, `river_spacing` | `3`, `3` | Rivers: count and min distance between starts |
 | `river_length_min`, `river_length_max` | `4`, `10` | Walk length in steps |
 | `river_downhill_bias`, `river_straightness` | `0.0`, `0.0` | Walk scoring bonuses |
+| `river_water` | `false` | Convert the river bed to WATER terrain (RIVER edges stay on the center line) |
+| `river_width` | `1` | Water rings around the bed (clamped to >= 1) |
 | `location_count`, `location_type` | `0`, `1` | Locations to place |
 | `location_terrain_filter` | `[]` | Empty accepts every cell (incl. water) |
 | `location_spacing` | `0` | Min topological distance between locations |
+| `roads` | `false` | Gate: connect all locations via MST + cost-aware trace |
+| `road_terrain` | `true` | Convert path terrain to ROAD (bridges stay WATER) |
+| `road_water_cost` | `8.0` | Extra cost to enter WATER (bridges allowed, not blocked) |
+| `road_mountain_cost` | `0.0` | Extra cost to enter MOUNTAIN (0 = cross freely) |
+| `road_cost_fn` | — | `(coord) -> float`, replaces both penalties |
 | `connectivity_mode` | `"report"` | `"repair"` carves WATER→PLAINS corridors |
 
 ## GridTopology (port)
@@ -114,9 +128,10 @@ translation layer.
 ## Snapshot
 
 `report.snapshot` = `{seed, width, height, heights, terrain_classes,
-elevation_scale, river_paths, locations, location_type}` — final state
-(post-smoothing). `TerrainForge.apply_snapshot()` re-materializes it on any
-topology with the same dimensions (hex or squares): same snapshot → same map.
+elevation_scale, river_paths, road_paths, locations, location_type}` — final
+state (post-smoothing). `TerrainForge.apply_snapshot()` re-materializes it on
+any topology with the same dimensions (hex or squares): same snapshot → same
+map. Snapshots without `road_paths` (older versions) still apply.
 
 ## Out of scope (v1 roadmap)
 

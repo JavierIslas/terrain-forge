@@ -57,8 +57,9 @@ static func generate_hex(map_width: int, map_height: int, params: Dictionary = {
 
 ## Regenera sobre un HexGrid ya existente (p. ej. restaurado con deserialize).
 ## Semántica de regeneración completa: los stages del forge limpian los edges
-## RIVER y las locations previos antes de escribir los nuevos (los edges de
-## OTROS tipos, como ROAD/WALL colocados por el juego, se preservan).
+## RIVER, las locations y — solo si corre con "roads": true — los edges ROAD
+## previos antes de escribir los nuevos. Los edges de otros tipos (ROAD/WALL
+## colocados por el juego) se preservan mientras el stage roads no corra.
 static func apply(host_grid, params: Dictionary = {}) -> void:
 	TerrainForge.generate(HexTopology.new(host_grid), params)
 
