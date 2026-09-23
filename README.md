@@ -5,7 +5,7 @@
 Procedural terrain generation for **Godot 4.6 / GDScript** with a **pluggable
 grid topology**: generate on **squares** (built-in, zero dependencies), on
 **hexagons** (via the FREE tier of
-[Hex Strategy Map](https://github.com/JavierIslas/hex-strategy-map)), or on
+[Hex Strategy Map](https://github.com/JavierIslas/hex-strategy-map-free)), or on
 **any topology you implement** by extending the `GridTopology` port.
 
 Deterministic for a fixed seed end-to-end: nothing consumes Godot's global RNG,
@@ -16,7 +16,7 @@ so generating in-editor, in CI or on a server yields the same map bit-for-bit.
 
 ## Why this exists
 
-[Hex Strategy Map](https://github.com/JavierIslas/hex-strategy-map)'s
+[Hex Strategy Map](https://github.com/JavierIslas/hex-strategy-map-free)'s
 `MapGenerator` is hex-only and lives inside that addon's paid tier. Terrain
 Forge extracts generation into its own product with the same output contract on
 hex (**bit-for-bit parity** with the host generator, test-frozen — migrating a
@@ -27,8 +27,8 @@ host never had.
 ## Features
 
 - Pipeline of injectable stages: `elevation → moisture → falloff → classify →
-  smooth → rivers → locations → connectivity` — reorder them, or pass your own
-  `Callable` stages.
+  smooth → rivers → locations → roads → connectivity` — reorder them, or pass
+  your own `Callable` stages.
 - **Squares** (4- or 8-connected) with zero host dependencies; **hex** via the
   host's FREE tier only; **custom topologies** by overriding ~16 virtuals on
   `GridTopology`.
@@ -42,6 +42,8 @@ host never had.
   majority-vote smoothing.
 - Rivers with high-elevation starts and spacing; locations with terrain filters
   and spacing.
+- Roads: MST + cost-aware Dijkstra trace between locations — bridges over
+  water, `road_cost_fn` hook.
 - Connectivity report + repair: carves `WATER→PLAINS` corridors so every land
   cell is reachable.
 - Serializable snapshots: re-materialize the exact same map on any topology
@@ -56,7 +58,7 @@ host never had.
 
 **From source** — copy `addons/terrain_forge/` into your project's `addons/`.
 
-Hex mode additionally needs [Hex Strategy Map](https://github.com/JavierIslas/hex-strategy-map)
+Hex mode additionally needs [Hex Strategy Map](https://github.com/JavierIslas/hex-strategy-map-free)
 — the **FREE tier is enough**; Terrain Forge never touches its PRO modules.
 
 ## Quick start
@@ -98,7 +100,7 @@ and a standalone squares demo).
 ## Testing
 
 Tests run under [gdUnit4](https://github.com/MikeSchulze/gdUnit4) in `test/unit/`
-(115 test cases, 12 suites):
+(159 test cases, 13 suites):
 
 ```bash
 godot --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
@@ -132,3 +134,5 @@ Terrain Forge is **dual-licensed**:
   including server-side use.
 
 For a commercial license: **islasjavieralf@gmail.com** for terms.
+
+— Javier Islas ([Dimcairion](https://dimcairion.itch.io))
