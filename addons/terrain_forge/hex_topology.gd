@@ -93,6 +93,11 @@ func distance(a: Vector2i, b: Vector2i) -> int:
 
 ## Línea hex reimplementada con primitivas públicas (el anfitrión la tiene
 ## privada): interpolación cube + cube_round, extremos incluidos.
+## Igual que la _hex_line del anfitrión (solo LOS, con null-checks), la
+## interpolación + redondeo puede producir offsets FUERA del rectángulo
+## odd-r aunque ambos extremos sean válidos (ej.: line((0,6),(0,8)) pasa
+## por (-1,7)). NO se corrige aquí: es geometría pura espejo del anfitrión;
+## filtrar con is_valid() y puentear los huecos es del consumidor.
 func line(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 	var result: Array[Vector2i] = []
 	var steps: int = distance(a, b)

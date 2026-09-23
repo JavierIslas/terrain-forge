@@ -19,6 +19,12 @@ extends RefCounted
 ## menor con la mayor tallando corredores (celdas no pasables → PLAINS) sobre
 ## topology.line(). Los checks de pasabilidad se evalúan EN VIVO, así los
 ## corredores previos cuentan para los siguientes.
+##
+## line() puede incluir waypoints fuera del grid (el redondeo de la
+## interpolación hex sale del rectángulo odd-r aunque los extremos sean
+## válidos): se saltan, y si dos waypoints válidos consecutivos quedan a
+## distancia > 1 se tiende un puente contiguo por vecinos — sin él, el
+## corredor queda agujereado y la componente sigue desconectada.
 
 const MODE_REPORT := "report"
 const MODE_REPAIR := "repair"
@@ -113,14 +119,74 @@ static func _build_report(topology: GridTopology, regions: Array) -> Dictionary:
 
 ## Corredor desde [param target] (componente menor) hacia la coord de
 ## [param largest] más cercana; convierte celdas no pasables a PLAINS.
+## line() puede devolver waypoints fuera del grid (contrato del puerto): se
+## saltan, y si al retomar quedan a distancia > 1 del último tallado se
+## tiende un puente contiguo — sin él, el corredor queda agujereado y la
+## componente sigue desconectada (~1/150 seeds hex).
 static func _carve_corridor(topology: GridTopology, is_passable: Callable, target: Vector2i, largest: Array) -> int:
 	var anchor := _closest_coord(topology, target, largest)
 	var carved := 0
+	var previous := anchor
 	for coord in topology.line(anchor, target):
-		if topology.is_valid(coord) and not is_passable.call(coord):
-			topology.set_terrain(coord, MapCell.Terrain.PLAINS)
-			carved += 1
+		if not topology.is_valid(coord):
+			continue
+		if topology.distance(previous, coord) > 1:
+			carved += _carve_bridge(topology, is_passable, previous, coord)
+		carved += _carve_cell(topology, is_passable, coord)
+		previous = coord
 	return carved
+
+
+## Convierte la celda a PLAINS si no es pasable (check en vivo: los corredores
+## previos cuentan para los siguientes). Retorna 1 si talló, 0 si no.
+static func _carve_cell(topology: GridTopology, is_passable: Callable, coord: Vector2i) -> int:
+	if is_passable.call(coord):
+		return 0
+	topology.set_terrain(coord, MapCell.Terrain.PLAINS)
+	return 1
+
+
+## Puente contiguo entre dos waypoints válidos que line() dejó a distancia
+## > 1. Caminata greedy determinista: entra siempre al vecino válido no
+## visitado más cercano al objetivo (empates por x, y — mismo orden total
+## del heap de RoadBuilder._trace). Terminación estructural: cada paso marca
+## una celda nueva (cota cell_count); sin candidatos se corta y degrada al
+## hueco previo; el report post-repair ya informa is_connected al caller.
+static func _carve_bridge(topology: GridTopology, is_passable: Callable, origin: Vector2i, goal: Vector2i) -> int:
+	var carved := 0
+	var current := origin
+	var visited := {origin: true}
+	while current != goal:
+		var candidates := _unvisited_neighbors(topology, current, visited)
+		if candidates.is_empty():
+			break
+		candidates.sort_custom(_by_distance_to(topology, goal))
+		current = candidates[0]
+		visited[current] = true
+		carved += _carve_cell(topology, is_passable, current)
+	return carved
+
+
+## Vecinos de [param current] válidos y aún no visitados por el puente.
+static func _unvisited_neighbors(topology: GridTopology, current: Vector2i, visited: Dictionary) -> Array[Vector2i]:
+	var candidates: Array[Vector2i] = []
+	for neighbor in topology.get_neighbors(current):
+		if topology.is_valid(neighbor) and not visited.has(neighbor):
+			candidates.append(neighbor)
+	return candidates
+
+
+## Comparador (distance al objetivo, x, y): orden total sobre coordenadas
+## distintas → resultado de sort único sin depender de estabilidad, sin rng.
+static func _by_distance_to(topology: GridTopology, goal: Vector2i) -> Callable:
+	return func(a: Vector2i, b: Vector2i) -> bool:
+		var distance_a := topology.distance(a, goal)
+		var distance_b := topology.distance(b, goal)
+		if distance_a != distance_b:
+			return distance_a < distance_b
+		if a.x != b.x:
+			return a.x < b.x
+		return a.y < b.y
 
 
 static func _closest_coord(topology: GridTopology, target: Vector2i, coords: Array) -> Vector2i:

@@ -47,6 +47,10 @@ func distance(a: Vector2i, b: Vector2i) -> int:
 
 ## Camino de celdas de [param a] a [param b], extremos incluidos. Usado por
 ## rectitud de ríos y corredores de reparación de conectividad.
+## El camino puede incluir celdas FUERA del grid (el redondeo de la
+## interpolación puede salirse del rectángulo aunque los extremos sean
+## válidos): el consumidor filtra con is_valid() y puentea los huecos —
+## mismo contrato de candidatos sin filtrar que get_neighbors().
 func line(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
 	_require_override("line")
 	return []

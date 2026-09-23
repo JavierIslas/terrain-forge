@@ -99,11 +99,12 @@ elevation → moisture → falloff → classify → smooth → rivers → locati
 ## GridTopology (port)
 
 Extend it to support any topology. Override the ~16 virtuals: geometry
-(`get_neighbors` — candidates **unfiltered**, `is_valid`, `distance`, `line`),
-iteration (`get_all_coords` row-major, `get_dimensions`, `cell_count`),
-storage (`get/set_terrain`, `get/set_elevation`, `set_location`,
-`has_location`, `set_edge`, `edge_count`). Defaults `push_error` and return
-neutral values.
+(`get_neighbors` — candidates **unfiltered**, `is_valid`, `distance`, `line` —
+may include **out-of-grid** cells between valid endpoints; consumers filter
+with `is_valid`, like `get_neighbors`), iteration (`get_all_coords` row-major,
+`get_dimensions`, `cell_count`), storage (`get/set_terrain`,
+`get/set_elevation`, `set_location`, `has_location`, `set_edge`,
+`edge_count`). Defaults `push_error` and return neutral values.
 
 ## Built-in topologies
 
