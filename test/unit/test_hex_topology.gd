@@ -99,6 +99,106 @@ func test_pathfinder_encuentra_camino_sobre_salida_del_forge() -> void:
 	assert_bool(path.size() >= 2).is_true()
 
 
+func test_repair_hex_conecta_seed_del_repro() -> void:
+	## Repro congelado del corredor agujereado: pre-fix, el sweep 1..150 en
+	## 15x15 con defaults dejaba 8 seeds desconectadas tras repair (12, 24,
+	## 26, 42, 45, 64, 139, 140 — regiones huérfanas tipo [162, 1]) porque
+	## los waypoints de line() fuera del rectángulo odd-r se saltaban sin
+	## puente.
+	var params := {"seed": 12, "connectivity_mode": "repair"}
+	var grid: HexGrid = HexTopology.generate_hex(15, 15, params)
+	var analysis := ConnectivityChecker.analyze(HexTopology.new(grid))
+	assert_bool(analysis.is_connected).is_true()
+
+
+func test_repair_hex_es_determinista() -> void:
+	## El puente greedy (desempates por distance, x, y) debe ser función pura
+	## del terreno: mismo seed + mismos params → mismos terrenos post-repair.
+	var params := {"seed": 12, "connectivity_mode": "repair"}
+	var a: HexGrid = HexTopology.generate_hex(15, 15, params)
+	var b: HexGrid = HexTopology.generate_hex(15, 15, params)
+	for coord in a.get_all_cells():
+		assert_int(b.get_cell(coord).terrain).is_equal(a.get_cell(coord).terrain)
+
+
+func test_repair_hex_no_cambia_mapa_ya_conectado() -> void:
+	var grid := HexGrid.new(10, 8)
+	grid.generate_cells()
+	for coord in grid.get_all_cells():
+		grid.set_terrain(coord, HexCell.Terrain.PLAINS)
+	var after := ConnectivityChecker.repair(HexTopology.new(grid))
+	assert_bool(after.is_connected).is_true()
+	assert_int(after.repaired).is_equal(0)
+
+
+func test_line_hex_puede_salirse_del_rectangulo() -> void:
+	## Contrato del que depende repair: la interpolación + redondeo puede
+	## producir offsets fuera del grid entre extremos válidos (verificado
+	## contra las fórmulas del anfitrión). Congelado para que un cambio en
+	## las fórmulas del anfitrión o un clamp futuro dispare revisión del fix.
+	var topology := HexTopology.new(HexGrid.new(15, 15))
+	topology.grid.generate_cells()
+	var path := topology.line(Vector2i(0, 6), Vector2i(0, 8))
+	assert_bool(path.has(Vector2i(-1, 7))).is_true()
+	assert_bool(topology.is_valid(Vector2i(-1, 7))).is_false()
+	for i in path.size() - 1:
+		assert_int(topology.distance(path[i], path[i + 1])).is_equal(1)
+
+
+func test_vecinos_validos_siempre_acercan_al_objetivo() -> void:
+	## Invariante de terminación del puente greedy de repair: en un
+	## rectángulo odd-r completo, desde cualquier celda (≠ objetivo) existe
+	## al menos un vecino VÁLIDO estrictamente más cercano al objetivo.
+	var topology := HexTopology.new(HexGrid.new(12, 12))
+	topology.grid.generate_cells()
+	for goal in topology.get_all_coords():
+		for current in topology.get_all_coords():
+			if current == goal:
+				continue
+			if not _tiene_vecino_valido_mas_cercano(topology, current, goal):
+				fail("sin vecino válido más cercano desde %s hacia %s" % [current, goal])
+				return
+
+
+func _tiene_vecino_valido_mas_cercano(topology: HexTopology, current: Vector2i, goal: Vector2i) -> bool:
+	var current_distance := topology.distance(current, goal)
+	for neighbor in topology.get_neighbors(current):
+		if topology.is_valid(neighbor) and topology.distance(neighbor, goal) < current_distance:
+			return true
+	return false
+
+
+const SWEEP_HEX_SEEDS := 300
+const SWEEP_HEX_GRANDE_SEEDS := 80
+
+
+func test_repair_hex_conecta_todos_los_seeds_del_sweep() -> void:
+	## Propiedad del fix: con connectivity_mode "repair" el mapa queda
+	## conexo para cualquier seed (pre-fix: 8/150 seeds fallaban en 15x15
+	## con defaults — corredores agujereados por waypoints fuera del grid).
+	for seed_value in range(1, SWEEP_HEX_SEEDS + 1):
+		var params := {"seed": seed_value, "connectivity_mode": "repair"}
+		var grid: HexGrid = HexTopology.generate_hex(15, 15, params)
+		var analysis := ConnectivityChecker.analyze(HexTopology.new(grid))
+		if not analysis.is_connected:
+			fail("seed %d quedó con %d componentes tras repair" % [
+				seed_value, analysis.regions.size()])
+			return
+
+
+func test_repair_hex_conecta_mapa_grande_del_sweep() -> void:
+	## Ídem sweep chico en 24x16: ejercita corredores más largos y más
+	## variedad de bordes jagged.
+	for seed_value in range(1, SWEEP_HEX_GRANDE_SEEDS + 1):
+		var params := {"seed": seed_value, "connectivity_mode": "repair"}
+		var grid: HexGrid = HexTopology.generate_hex(24, 16, params)
+		var analysis := ConnectivityChecker.analyze(HexTopology.new(grid))
+		if not analysis.is_connected:
+			fail("seed %d quedó con %d componentes tras repair (24x16)" % [
+				seed_value, analysis.regions.size()])
+			return
+
+
 func test_line_hex_es_continua_y_termina_en_destino() -> void:
 	var topology := HexTopology.new(HexGrid.new(10, 10))
 	topology.grid.generate_cells()

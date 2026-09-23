@@ -318,6 +318,20 @@ func test_stage_conectividad_reporta_por_defecto_y_repara_bajo_pedido() -> void:
 	assert_bool(repair_report.connectivity.is_connected).is_true()
 
 
+func test_repair_cuadrados_conecta_todos_los_seeds_del_sweep() -> void:
+	## Brazo de no-regresión del fix de corredores con puente: las líneas
+	## squares nunca salen del rectángulo, así que este sweep cuida que el
+	## camino nuevo no rompa la conectividad en cuadrados.
+	for seed_value in range(1, 61):
+		var topo := _make_topology(15, 15)
+		var report := TerrainForge.generate_with_report(topo, {
+			"seed": seed_value, "connectivity_mode": "repair"})
+		if not report.connectivity.is_connected:
+			fail("seed %d quedó con %d componentes tras repair (squares)" % [
+				seed_value, report.connectivity.regions.size()])
+			return
+
+
 func test_stages_con_buffer_sin_elevation_reportan_error() -> void:
 	var topo := _make_topology(5, 5)
 	TerrainForge.generate(topo, {"seed": 1, "stages": [TerrainForge.STAGE_CLASSIFY]})

@@ -79,6 +79,10 @@ func test_repair_conecta_componentes_tallando_corredor() -> void:
 	assert_bool(after.is_connected).is_true()
 	assert_int(after.repaired).is_greater(0)
 	assert_int(topo.get_terrain(Vector2i(3, 0))).is_equal(MapCell.Terrain.PLAINS)
+	# Corredor bien comportado: talla exactamente la celda del camino y nada más.
+	assert_int(after.repaired).is_equal(1)
+	for y in range(1, 5):
+		assert_int(topo.get_terrain(Vector2i(3, y))).is_equal(MapCell.Terrain.WATER)
 
 
 func test_repair_no_cambia_mapa_ya_conectado() -> void:
@@ -107,3 +111,64 @@ func test_repair_es_determinista() -> void:
 	var terrains_b: Dictionary = results[1][2]
 	for coord in terrains_a:
 		assert_int(terrains_b[coord]).is_equal(terrains_a[coord])
+
+
+func test_repair_puentea_waypoints_fuera_del_grid() -> void:
+	## Regresión del corredor agujereado: line() con un waypoint fuera del
+	## grid entre extremos válidos a distancia 2 (el artefacto odd-r del
+	## lerp+round hex). Sin puente, el waypoint se salta y las componentes
+	## quedan a distancia 2 → desconectadas.
+	var grid := SquareGrid.new(5, 10)
+	grid.generate_cells()
+	var topo := DetourLineTopology.new(
+		grid, Vector2i(0, 6), Vector2i(0, 8), [Vector2i(-1, 7)])
+	_fill(topo, MapCell.Terrain.WATER)
+	topo.set_terrain(Vector2i(0, 6), MapCell.Terrain.PLAINS)
+	topo.set_terrain(Vector2i(0, 8), MapCell.Terrain.PLAINS)
+	var after := ConnectivityChecker.repair(topo)
+	assert_bool(after.is_connected).is_true()
+	assert_int(topo.get_terrain(Vector2i(0, 7))).is_equal(MapCell.Terrain.PLAINS)
+	assert_int(after.repaired).is_equal(1)
+
+
+func test_repair_puentea_salto_de_varios_pasos() -> void:
+	## Variante con DOS waypoints fugados consecutivos (gap de distancia 3):
+	## el puente debe recorrer las celdas intermedias dentro del grid.
+	var grid := SquareGrid.new(5, 10)
+	grid.generate_cells()
+	var topo := DetourLineTopology.new(
+		grid, Vector2i(0, 5), Vector2i(0, 8), [Vector2i(-2, 7), Vector2i(-1, 8)])
+	_fill(topo, MapCell.Terrain.WATER)
+	topo.set_terrain(Vector2i(0, 5), MapCell.Terrain.PLAINS)
+	topo.set_terrain(Vector2i(0, 8), MapCell.Terrain.PLAINS)
+	var after := ConnectivityChecker.repair(topo)
+	assert_bool(after.is_connected).is_true()
+	assert_int(topo.get_terrain(Vector2i(0, 6))).is_equal(MapCell.Terrain.PLAINS)
+	assert_int(topo.get_terrain(Vector2i(0, 7))).is_equal(MapCell.Terrain.PLAINS)
+
+
+## Doble de topología: line() que emula el artefacto del lerp+round hex
+## (waypoints fuera del grid entre extremos válidos). Solo muta el par
+## inyectado; el resto delega en la línea squares real (misma familia que
+## TriangleTopology en test_terrain_forge.gd: topología real con el
+## contrato del puerto ejercitado en un edge case).
+class DetourLineTopology extends SquareTopology:
+	var detour_from: Vector2i
+	var detour_to: Vector2i
+	var detour_cells: Array[Vector2i] = []
+
+
+	func _init(square_grid: SquareGrid, from_coord: Vector2i, to_coord: Vector2i, cells: Array[Vector2i]) -> void:
+		super(square_grid)
+		detour_from = from_coord
+		detour_to = to_coord
+		detour_cells = cells
+
+
+	func line(a: Vector2i, b: Vector2i) -> Array[Vector2i]:
+		if a == detour_from and b == detour_to:
+			var detoured: Array[Vector2i] = [a]
+			detoured.append_array(detour_cells)
+			detoured.append(b)
+			return detoured
+		return super(a, b)
