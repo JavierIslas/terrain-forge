@@ -15,3 +15,14 @@ pack.sh export-ignore
 project.godot export-ignore
 icon.svg export-ignore
 icon.svg.import export-ignore
+
+# Line endings: LF en todo el texto del repo (Godot escribe LF en todas las
+# plataformas; evita diffs ruidosos y archivos mixtos si entra contribuidores
+# desde Windows).
+* text=auto eol=lf
+*.png binary
+*.zip binary
+# Vendor de terceros intacto: sin conversión de line endings en su contenido
+# (gdUnit4 trae un .tscn con finales mixtos que no nos toca renormalizar).
+addons/gdUnit4/** -text
+addons/hex_strategy_map/** -text
