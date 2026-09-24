@@ -51,30 +51,52 @@ jobs:
       # HexGrid/HexCell/PathFinder, and gdUnit4 itself).
       - name: Editor pass (parse errors + class cache)
         run: |
-          set -euo pipefail
-          godot --headless --editor --quit > /tmp/editor.log 2>&1 || true
-          if grep -qE "SCRIPT ERROR|Parse Error" /tmp/editor.log; then
-            echo "::error::script parse errors during the editor pass"
-            tail -40 /tmp/editor.log
+          set -o pipefail
+          godot --headless --editor --quit 2>&1 | tee /tmp/editor.log
+          status=${PIPESTATUS[0]}
+
+          if [ "$status" -ne 0 ] || grep -qE \
+              'SCRIPT ERROR|Parse Error|Failed to load script' \
+              /tmp/editor.log; then
+            echo "::error::Godot editor reported script errors"
             exit 1
           fi
 
       - name: Unit tests (gdUnit4)
         run: |
-          set -euo pipefail
-          godot --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
-              -a res://test/unit --ignoreHeadlessMode -c > /tmp/gdunit.log 2>&1 \
-            || { tail -30 /tmp/gdunit.log; \
-                 echo "::error::gdUnit4 exited non-zero (100=failures, 101=orphans)"; exit 1; }
-          # Strip ANSI colors before parsing the summary line.
+          set -o pipefail
+
+          godot --headless --path . \
+            -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
+            -a res://test/unit \
+            --ignoreHeadlessMode \
+            -c 2>&1 | tee /tmp/gdunit.log
+          status=${PIPESTATUS[0]}
+
+          echo "::group::Script load and parse errors"
+          grep -n -E -C 5 \
+            'Failed to load script|SCRIPT ERROR|Parse Error' \
+            /tmp/gdunit.log || true
+          echo "::endgroup::"
+
+          if [ "$status" -ne 0 ]; then
+            echo "::error::gdUnit4 failed with exit code $status"
+            exit "$status"
+          fi
+
           sed 's/\x1b\[[0-9;]*m//g' /tmp/gdunit.log > /tmp/gdunit.clean
-          tests="$(grep -oP 'Overall Summary: \K[0-9]+' /tmp/gdunit.clean | head -1)"
+          tests="$(grep -oP 'Overall Summary: \K[0-9]+' \
+            /tmp/gdunit.clean | head -1 || true)"
+
           if [ -z "$tests" ] || [ "$tests" -eq 0 ]; then
-            echo "::error::gdUnit4 collected 0 tests — test collection is broken"
+            echo "::error::gdUnit4 collected 0 tests"
             exit 1
           fi
-          if grep -qE "Failed to load script|SCRIPT ERROR" /tmp/gdunit.log; then
-            echo "::error::at least one test script failed to load/parse"
+
+          if grep -qE 'Failed to load script|SCRIPT ERROR|Parse Error' \
+              /tmp/gdunit.log; then
+            echo "::error::A test script failed to load or parse"
             exit 1
           fi
+
           echo "gdUnit4 ran ${tests} tests"
