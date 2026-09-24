@@ -43,3 +43,7 @@ desktop.ini
 
 # HTML docs generados
 *.html
+# Excepción: el gdUnit4 vendoreado necesita sus templates .html en el checkout
+# (el HTML reporter los carga en runtime); sin ellos escupe SCRIPT ERROR y
+# rompe el gate de CI aunque todos los tests pasen.
+!addons/gdUnit4/**/*.html
