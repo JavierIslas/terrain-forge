@@ -450,3 +450,50 @@ func _count_terrain(topo: GridTopology, terrain: int) -> int:
 		if topo.get_terrain(coord) == terrain:
 			count += 1
 	return count
+
+
+func _make_full_report(topology: SquareTopology) -> Dictionary:
+	return TerrainForge.generate_with_report(topology, {
+		"seed": 42, "smoothing_passes": 1, "river_count": 4,
+		"location_count": 3, "roads": true})
+
+
+func test_snapshot_roundtrip_binario_sobrevive_con_tipos_exactos() -> void:
+	## El snapshot viaja a disco con var_to_bytes/bytes_to_var (binary-safe):
+	## JSON devolvería los Vector2i como Array y apply_snapshot fallaría
+	## (documentado en getting_started, "Saving maps to disk").
+	var topo := _make_topology(24, 18)
+	var report := _make_full_report(topo)
+	var restored: Dictionary = bytes_to_var(var_to_bytes(report.snapshot))
+	assert_bool(restored.heights is PackedFloat32Array).is_true()
+	assert_bool(restored.terrain_classes is PackedInt32Array).is_true()
+	# Congela la fixture: con este seed/params hay ríos y locations que tipar.
+	assert_int(report.snapshot.river_paths.size()).is_greater(0)
+	assert_int(report.snapshot.locations.size()).is_greater(0)
+	for path in restored.river_paths:
+		assert_bool(path[0] is Vector2i).is_true()
+	for coord in restored.locations:
+		assert_bool(coord is Vector2i).is_true()
+	assert_int(restored.width).is_equal(report.snapshot.width)
+	assert_int(restored.height).is_equal(report.snapshot.height)
+
+
+func test_snapshot_roundtrip_binario_rematerializa_estado_completo() -> void:
+	## Snapshot ida y vuelta por "disco" (bytes) + apply_snapshot sobre una
+	## topología nueva: terreno, elevación, edges y locations idénticos.
+	var original := _make_topology(24, 18)
+	var report := _make_full_report(original)
+	var restored: Dictionary = bytes_to_var(var_to_bytes(report.snapshot))
+	var reloaded := _make_topology(24, 18)
+	TerrainForge.apply_snapshot(reloaded, restored)
+	for coord in original.get_all_coords():
+		assert_int(reloaded.get_terrain(coord)).is_equal(original.get_terrain(coord))
+		assert_float(reloaded.get_elevation(coord)).is_equal(original.get_elevation(coord))
+	var locations_original := 0
+	var locations_reloaded := 0
+	for coord in original.get_all_coords():
+		locations_original += 1 if original.has_location(coord) else 0
+		locations_reloaded += 1 if reloaded.has_location(coord) else 0
+	assert_int(locations_original).is_greater(0)
+	assert_int(locations_reloaded).is_equal(locations_original)
+	assert_int(reloaded.edge_count()).is_equal(original.edge_count())
