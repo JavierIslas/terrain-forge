@@ -134,6 +134,12 @@ state (post-smoothing). `TerrainForge.apply_snapshot()` re-materializes it on
 any topology with the same dimensions (hex or squares): same snapshot → same
 map. Snapshots without `road_paths` (older versions) still apply.
 
+Persistence: binary-safe, not JSON-round-trip-safe. `var_to_bytes` /
+`bytes_to_var` preserve every type exactly; `JSON.parse_string` returns the
+`Vector2i` values in `river_paths`, `road_paths` and `locations` as plain
+`Array`s, which `apply_snapshot` rejects. For JSON saves use
+`SquareGrid.serialize()` / `deserialize()` (whole grid, squares standalone).
+
 ## Out of scope (v1 roadmap)
 
 Pathfinding on squares — the host's `PathFinder` hardcodes hex neighbors;

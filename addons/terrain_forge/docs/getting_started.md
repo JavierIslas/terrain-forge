@@ -82,6 +82,46 @@ TerrainForge.apply_snapshot(other_topology, report.snapshot)
 HexTopology.apply(loaded_hex_grid, {"seed": 42, "island_falloff": 0.3})
 ```
 
+## Saving maps to disk
+
+Terrain Forge never touches the filesystem: `report.snapshot` is a plain
+`Dictionary` and the file I/O belongs to your game. Serialize it with Variant
+binary encoding and it round-trips losslessly — generate a map during
+development, load it in the shipped game:
+
+```gdscript
+# Save (dev tool / editor):
+var file := FileAccess.open("user://map01.save", FileAccess.WRITE)
+file.store_buffer(var_to_bytes(report.snapshot))
+
+# Load (in game): build an EMPTY topology with the same dimensions, then apply.
+var reader := FileAccess.open("user://map01.save", FileAccess.READ)
+var snapshot: Dictionary = bytes_to_var(reader.get_buffer(reader.get_length()))
+TerrainForge.apply_snapshot(topology, snapshot)
+```
+
+**Do not JSON-round-trip the snapshot.** `JSON.stringify(snapshot)` works, but
+`JSON.parse_string` returns the `Vector2i` values inside `river_paths`,
+`road_paths` and `locations` as plain `Array`s — and `apply_snapshot` feeds
+them to typed parameters, which fails at runtime on any map with rivers, roads
+or locations. Use `var_to_bytes`/`bytes_to_var`; if you need readable JSON
+saves, convert those paths back to `Vector2i` after parsing.
+
+For squares standalone there is a JSON-safe alternative that persists the
+whole grid — per-cell metadata/tags, your own edges, cost tables — not just
+the forged state:
+
+```gdscript
+var file := FileAccess.open("user://grid.json", FileAccess.WRITE)
+file.store_string(JSON.stringify(grid.serialize()))
+# Later:
+var grid := SquareGrid.deserialize(JSON.parse_string(text))
+```
+
+In hex mode, restore the host grid with its own `deserialize`, then run the
+forge on top of it (`HexTopology.apply`) — or `apply_snapshot` through
+`HexTopology.new(host_grid)`.
+
 ## Where to look next
 
 - `docs/api_reference.md` — full params table and port contract.
