@@ -98,13 +98,19 @@ elevation → moisture → falloff → classify → smooth → rivers → locati
 
 ## GridTopology (port)
 
-Extend it to support any topology. Override the ~16 virtuals: geometry
-(`get_neighbors` — candidates **unfiltered**, `is_valid`, `distance`, `line` —
-may include **out-of-grid** cells between valid endpoints; consumers filter
-with `is_valid`, like `get_neighbors`), iteration (`get_all_coords` row-major,
-`get_dimensions`, `cell_count`), storage (`get/set_terrain`,
+Extend it to support any topology. Override the ~16 required virtuals:
+geometry (`get_neighbors` — candidates **unfiltered**, `is_valid`, `distance`,
+`line` — may include **out-of-grid** cells between valid endpoints; consumers
+filter with `is_valid`, like `get_neighbors`), iteration (`get_all_coords`
+row-major, `get_dimensions`, `cell_count`), storage (`get/set_terrain`,
 `get/set_elevation`, `set_location`, `has_location`, `set_edge`,
 `edge_count`). Defaults `push_error` and return neutral values.
+
+Three **optional** cost virtuals default to neutral semantics, so a topology
+without a cost model searches with uniform costs: `get_movement_cost` (1.0),
+`is_passable` (= `is_valid`), `get_edge_cost` (0.0). The built-ins override
+them to mirror the host's cost resolution (`SquareGrid` cost tables; host
+grid methods, including its A* heuristic cache).
 
 ## Built-in topologies
 
@@ -118,6 +124,64 @@ with `is_valid`, like `get_neighbors`), iteration (`get_all_coords` row-major,
   ```
   Writes through the host's public API (`set_terrain` keeps its A* heuristic
   cache correct).
+
+## GridSearch (search, static)
+
+Generic search over **any** topology — the same calls work on
+`SquareTopology`, `HexTopology` and custom ports:
+
+```gdscript
+static func find_reachable(topology, origin: Vector2i, max_cost: float, params: Dictionary = {}) -> Dictionary
+static func find_path(topology, origin: Vector2i, target: Vector2i, params: Dictionary = {}) -> Array[Vector2i]
+static func find_path_astar(topology, origin: Vector2i, target: Vector2i, params: Dictionary = {}) -> Array[Vector2i]
+```
+
+- `find_reachable` → `Dictionary[Vector2i, float]`: every cell reachable
+  within the movement budget (origin at 0.0; cells costing exactly the
+  budget are included). The tactical movement-range primitive.
+- `find_path` / `find_path_astar` → optimal path with **both endpoints
+  included** (unlike the host's searcher, which omits the origin); `[]` if
+  unreachable. `find_path_astar` scales `topology.distance` by the cheapest
+  passable terrain cost (faster on large maps; `find_path` is the optimal
+  reference).
+- Step cost mirrors the host: `get_movement_cost(target) +
+  get_edge_cost(origin, target)` — river edges (+2.0) make crossing
+  expensive, road edges (−0.5) make it cheap; impassability is terrain-only
+  (WATER −1.0). Deterministic by construction (total-order heap
+  `(cost, x, y)`); read-only over the topology, so regenerating the map
+  between calls is safe.
+- `params`: `"cost_fn"` `(from, to) -> float` (replaces the additive model),
+  `"passable_fn"` `(coord) -> bool` (replaces `is_passable`; also governs
+  target validation — the bridge pattern for water-crossing roads),
+  `"reachable"` (restricts `find_path` to a set from `find_reachable`,
+  replacing the passability filter).
+- Frozen by parity test: on hex, `find_reachable` costs match the host's
+  searcher key-for-key and `find_path` matches its optimal cost.
+
+## Pathfinding: why not AStarGrid2D / NavigationServer2D?
+
+Godot's `AStarGrid2D` is a good fit for **games** that only need
+point-to-point paths on a rectangular square grid. If that's your case:
+
+```gdscript
+var astar := AStarGrid2D.new()
+astar.region = Rect2i(0, 0, grid.width, grid.height)
+astar.diagonal_mode = AStarGrid2D.DIAGONAL_MODE_NEVER  # von Neumann; ALWAYS for Moore
+astar.update()  # clears solids/weights: (re)apply them after every update()
+for coord in grid.get_all_cells():
+	if grid.is_passable(coord):
+		astar.set_point_weight_scale(coord, grid.get_movement_cost(coord))
+	else:
+		astar.set_point_solid(coord)
+var path: Array[Vector2i] = astar.get_id_path(from_coord, to_coord)
+```
+
+Keep `jumping_enabled = false` (it ignores weight scales). What it cannot
+express — and `GridSearch` can: per-**edge** costs (rivers/roads between
+cells), `find_reachable` movement ranges, non-rectangular topologies and
+hex. `NavigationServer2D` / `TileSet` navigation layers are polygon navmesh
+for continuous agents — the wrong model for cell-by-cell turns (float
+waypoints, region-level costs only).
 
 ## Enum alignment (frozen by test)
 
@@ -142,5 +206,6 @@ Persistence: binary-safe, not JSON-round-trip-safe. `var_to_bytes` /
 
 ## Out of scope (v1 roadmap)
 
-Pathfinding on squares — the host's `PathFinder` hardcodes hex neighbors;
-a square grid needs its own search (documented roadmap).
+Fog of war, renderers and turn management belong to the host stack (hex) or
+to your game (squares). Square pathfinding shipped as `GridSearch` (see
+above).

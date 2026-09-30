@@ -46,6 +46,10 @@ host never had.
   water, `road_cost_fn` hook.
 - Connectivity report + repair: carves `WATER→PLAINS` corridors so every land
   cell is reachable.
+- Pathfinding & movement range on **any** topology: `GridSearch.find_path` /
+  `find_reachable` / `find_path_astar` with terrain + river/road edge costs,
+  deterministic (total-order tie-break), cost parity with the host's searcher
+  frozen by test.
 - Serializable snapshots: re-materialize the exact same map on any topology
   with the same dimensions.
 

@@ -62,6 +62,23 @@ class_name TriangleTopology extends GridTopology
 # rivers, smoothing, connectivity and locations work unchanged.
 ```
 
+## Pathfinding & movement range (any topology)
+
+```gdscript
+var topology := SquareTopology.new(grid)
+# Movement range: every cell reachable with 6 movement points (origin at 0.0).
+var reachable: Dictionary = GridSearch.find_reachable(topology, origin, 6.0)
+# Optimal path — terrain + river/road edge costs, both endpoints included.
+var path: Array[Vector2i] = GridSearch.find_path(topology, origin, target)
+# Restrict the path to the reachable set (fog/unexplored filtering pattern):
+path = GridSearch.find_path(topology, origin, target, {"reachable": reachable})
+```
+
+The same calls work on `HexTopology` and custom ports; costs come from the
+port (`get_movement_cost` / `get_edge_cost`, mirrored from the host). See the
+API reference for `find_path_astar`, injectable `cost_fn`/`passable_fn`, and
+when plain `AStarGrid2D` is enough for your game.
+
 ## Custom pipeline stage
 
 ```gdscript
