@@ -120,85 +120,13 @@ static func _mst_pairs(topology: GridTopology, locations: Array[Vector2i]) -> Ar
 	return pairs
 
 
-## Dijkstra con early-exit al settle del objetivo y lazy deletion. El heap
-## ordena por (cost, x, y) — orden total — y las relajaciones usan "<"
-## estricto: el orden de settle y los parents son únicos → determinismo
-## exacto sin depender del orden de get_neighbors.
+## Dijkstra delegado a GridSearch (heap con orden total (cost, x, y):
+## determinismo exacto sin depender del orden de get_neighbors). Sin filtro
+## de pasabilidad y con destino siempre permitido: los puentes sobre agua son
+## parte del diseño de caminos.
 ## Retorna el camino de a a b (extremos incluidos) o [] si es inalcanzable.
 static func _trace(topology: GridTopology, origin: Vector2i, target: Vector2i, cost_of: Callable) -> Array[Vector2i]:
-	var dist := {origin: 0.0}
-	var parent := {}
-	var heap: Array = []
-	_heap_push(heap, 0.0, origin)
-	while not heap.is_empty():
-		var entry: Array = _heap_pop(heap)
-		var coord: Vector2i = entry[1]
-		var d: float = entry[0]
-		if d > dist.get(coord, INF):
-			continue
-		if coord == target:
-			break
-		for neighbor in topology.get_neighbors(coord):
-			if not topology.is_valid(neighbor):
-				continue
-			var nd: float = d + cost_of.call(neighbor)
-			if nd < dist.get(neighbor, INF):
-				dist[neighbor] = nd
-				parent[neighbor] = coord
-				_heap_push(heap, nd, neighbor)
-	if target != origin and not parent.has(target):
-		return []
-	var path: Array[Vector2i] = [target]
-	var cursor := target
-	while cursor != origin:
-		cursor = parent[cursor]
-		path.append(cursor)
-	path.reverse()
-	return path
-
-
-# --- Heap binario mínimo con orden total (cost, x, y) ---
-
-static func _heap_push(heap: Array, cost: float, coord: Vector2i) -> void:
-	heap.append([cost, coord])
-	var index := heap.size() - 1
-	while index > 0:
-		var parent_index := (index - 1) / 2
-		if not _heap_entry_less(heap[index], heap[parent_index]):
-			break
-		var swapped = heap[index]
-		heap[index] = heap[parent_index]
-		heap[parent_index] = swapped
-		index = parent_index
-
-
-static func _heap_pop(heap: Array) -> Array:
-	var top: Array = heap[0]
-	heap[0] = heap[heap.size() - 1]
-	heap.remove_at(heap.size() - 1)
-	var index := 0
-	while true:
-		var smallest := index
-		var left := 2 * index + 1
-		var right := 2 * index + 2
-		if left < heap.size() and _heap_entry_less(heap[left], heap[smallest]):
-			smallest = left
-		if right < heap.size() and _heap_entry_less(heap[right], heap[smallest]):
-			smallest = right
-		if smallest == index:
-			break
-		var swapped = heap[index]
-		heap[index] = heap[smallest]
-		heap[smallest] = swapped
-		index = smallest
-	return top
-
-
-static func _heap_entry_less(a: Array, b: Array) -> bool:
-	if a[0] != b[0]:
-		return a[0] < b[0]
-	var ca: Vector2i = a[1]
-	var cb: Vector2i = b[1]
-	if ca.x != cb.x:
-		return ca.x < cb.x
-	return ca.y < cb.y
+	return GridSearch.find_path(topology, origin, target, {
+		"cost_fn": func(_from: Vector2i, to: Vector2i) -> float: return cost_of.call(to),
+		"passable_fn": func(_coord: Vector2i) -> bool: return true,
+	})
