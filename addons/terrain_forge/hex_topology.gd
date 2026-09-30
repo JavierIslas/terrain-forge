@@ -193,3 +193,17 @@ func clear_edges(edge_type: int) -> int:
 			grid.edges.erase(key)
 			removed += 1
 	return removed
+
+
+# --- Costos (delegados a la resolución del anfitrión, cache incluida) ---
+
+func get_movement_cost(coord: Vector2i) -> float:
+	return grid.get_movement_cost(coord)
+
+
+func is_passable(coord: Vector2i) -> bool:
+	return grid.is_passable(coord)
+
+
+func get_edge_cost(a: Vector2i, b: Vector2i) -> float:
+	return grid.get_edge_cost(a, b)

@@ -86,3 +86,35 @@ func test_map_cell_serialize_roundtrip() -> void:
 func test_terrain_cost_default_tiene_cinco_terrenos() -> void:
 	assert_int(SquareGrid.TERRAIN_COST.size()).is_equal(5)
 	assert_float(SquareGrid.TERRAIN_COST[MapCell.Terrain.WATER]).is_equal(-1.0)
+
+
+func test_get_movement_cost_resuelve_por_tabla_de_terreno() -> void:
+	var grid := SquareGrid.new(4, 4)
+	grid.generate_cells()
+	grid.set_terrain(Vector2i(0, 0), MapCell.Terrain.MOUNTAIN)
+	assert_float(grid.get_movement_cost(Vector2i(0, 0))).is_equal(3.0)
+	assert_float(grid.get_movement_cost(Vector2i(1, 0))).is_equal(1.5)
+
+
+func test_get_movement_cost_celda_inexistente_es_menos_uno() -> void:
+	var grid := SquareGrid.new(4, 4)
+	grid.generate_cells()
+	assert_float(grid.get_movement_cost(Vector2i(9, 9))).is_equal(-1.0)
+
+
+func test_is_passable_excluye_agua_y_celdas_inexistentes() -> void:
+	var grid := SquareGrid.new(4, 4)
+	grid.generate_cells()
+	grid.set_terrain(Vector2i(0, 0), MapCell.Terrain.WATER)
+	assert_bool(grid.is_passable(Vector2i(0, 0))).is_false()
+	assert_bool(grid.is_passable(Vector2i(1, 0))).is_true()
+	assert_bool(grid.is_passable(Vector2i(9, 9))).is_false()
+
+
+func test_get_edge_cost_sin_edge_es_cero_y_con_edge_es_simetrico() -> void:
+	var grid := SquareGrid.new(4, 4)
+	grid.generate_cells()
+	assert_float(grid.get_edge_cost(Vector2i(0, 0), Vector2i(1, 0))).is_equal(0.0)
+	grid.set_edge(Vector2i(0, 0), Vector2i(1, 0), SquareGrid.EdgeType.RIVER)
+	assert_float(grid.get_edge_cost(Vector2i(0, 0), Vector2i(1, 0))).is_equal(2.0)
+	assert_float(grid.get_edge_cost(Vector2i(1, 0), Vector2i(0, 0))).is_equal(2.0)

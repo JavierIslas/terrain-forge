@@ -124,6 +124,18 @@ func clear_edges(edge_type: int) -> int:
 	return removed
 
 
+func get_movement_cost(coord: Vector2i) -> float:
+	return grid.get_movement_cost(coord)
+
+
+func is_passable(coord: Vector2i) -> bool:
+	return grid.is_passable(coord)
+
+
+func get_edge_cost(a: Vector2i, b: Vector2i) -> float:
+	return grid.get_edge_cost(a, b)
+
+
 ## Escalera 4-conectada: avanza por el eje con mayor distancia restante
 ## (empate → x). Monótona y determinista; largo |dx| + |dy| + 1.
 static func _line_staircase(a: Vector2i, b: Vector2i) -> Array[Vector2i]:

@@ -129,5 +129,27 @@ func clear_edges(edge_type: int) -> int:
 	return 0
 
 
+# --- Costos de movimiento (defaults neutrales, sin override requerido) ---
+# Una topología sin modelo de costos participa de la búsqueda con costos
+# uniformes; las topologías con tablas los sobrescriben. La semántica espeja
+# la resolución de costos del anfitrión: costo de entrar = terreno del
+# destino + edge (origen, destino).
+
+## Costo de moverse a [param coord] según su terreno; -1.0 = intransitable.
+func get_movement_cost(coord: Vector2i) -> float:
+	return 1.0
+
+
+## true si [param coord] es transitable (existe y su terreno lo permite).
+func is_passable(coord: Vector2i) -> bool:
+	return is_valid(coord)
+
+
+## Costo adicional del edge entre [param a] y [param b] (ríos que encarecen,
+## caminos que abaratan); 0.0 si no hay edge definido.
+func get_edge_cost(a: Vector2i, b: Vector2i) -> float:
+	return 0.0
+
+
 func _require_override(method_name: String) -> void:
 	push_error("GridTopology: '%s' debe ser sobrescrito por la topología concreta" % method_name)

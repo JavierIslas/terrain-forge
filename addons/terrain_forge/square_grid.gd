@@ -15,7 +15,8 @@ extends RefCounted
 ## Grid de celdas cuadradas: espejo de la mitad agnóstica de topología que la
 ## investigación verificó en el grid hexagonal del anfitrión (almacenamiento
 ## rectangular por Vector2i, costos extensibles, edges con clave simétrica,
-## serialize). Sin niebla ni pathfinding: esos consumos pertenecen al anfitrión.
+## serialize) más la resolución de costos que consume la búsqueda genérica del
+## addon. Sin niebla: ese consumo pertenece al anfitrión.
 
 enum EdgeType { NONE, RIVER, ROAD, WALL, CUSTOM }
 
@@ -118,6 +119,27 @@ func has_edge(a: Vector2i, b: Vector2i) -> bool:
 ## Elimina el edge entre [param a] y [param b] si existe.
 func remove_edge(a: Vector2i, b: Vector2i) -> void:
 	edges.erase(edge_key(a, b))
+
+
+# --- Resolución de costos (espejo del anfitrión) ---
+
+## Costo de terreno de ENTRAR a [param coord]; -1.0 si la celda no existe o
+## el terreno no está mapeado en la tabla.
+func get_movement_cost(coord: Vector2i) -> float:
+	var cell := get_cell(coord)
+	if not cell:
+		return -1.0
+	return terrain_cost.get(cell.terrain, -1.0)
+
+
+## true si [param coord] existe y su costo de terreno > 0 (no intransitable).
+func is_passable(coord: Vector2i) -> bool:
+	return get_movement_cost(coord) > 0.0
+
+
+## Costo adicional del edge entre [param from] y [param to]; 0.0 sin edge.
+func get_edge_cost(from: Vector2i, to: Vector2i) -> float:
+	return get_edge(from, to).get("cost", 0.0)
 
 
 ## Esquina superior izquierda del tile en píxeles (para demos de render).
