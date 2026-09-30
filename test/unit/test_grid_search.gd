@@ -185,6 +185,18 @@ func test_passable_fn_inyectable_filtra_vecinos() -> void:
 	assert_int(path.size()).is_greater(2)
 
 
+func test_find_path_con_passable_fn_destino_agua_es_alcanzable() -> void:
+	## La passable_fn gobierna también la validación del destino: es el patrón
+	## puente del trazado de caminos (cruzar/terminar en agua penalizada).
+	var grid := _make_grid(3, 1)
+	grid.set_terrain(Vector2i(1, 0), MapCell.Terrain.WATER)
+	var path := GridSearch.find_path(SquareTopology.new(grid), Vector2i(0, 0), Vector2i(2, 0), {
+		"passable_fn": func(_coord: Vector2i) -> bool: return true,
+		"cost_fn": func(_from: Vector2i, _to: Vector2i) -> float: return 1.0,
+	})
+	assert_int(path.size()).is_equal(3)
+
+
 func test_params_reachable_restringe_la_busqueda() -> void:
 	var topo := SquareTopology.new(_make_grid(5, 5))
 	var island := {Vector2i(0, 0): 0.0, Vector2i(1, 0): 1.5}

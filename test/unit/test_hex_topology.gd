@@ -226,3 +226,57 @@ func test_apply_regenera_terreno_sobre_grid_existente() -> void:
 	HexTopology.apply(grid, {"seed": 99, "stages": [TerrainForge.STAGE_ELEVATION, TerrainForge.STAGE_CLASSIFY]})
 	for coord in grid.get_all_cells():
 		assert_int(grid.get_cell(coord).terrain).is_equal(expected.get_cell(coord).terrain)
+
+
+func test_grid_search_coincide_con_anfitrion_en_reachable() -> void:
+	## Parity de costos sobre el MISMO HexGrid forjado: el Dijkstra genérico
+	## del puerto y el buscador del anfitrión (hex-específico) alcanzan los
+	## mismos costos clave a clave. Los costos Dijkstra son únicos aunque los
+	## empates de camino se resuelvan distinto (heap con orden total acá, heap
+	## del anfitrión allá); con las tablas congeladas los pasos son múltiplos
+	## de 0.5 y la igualdad es exacta.
+	for seed_value in [0, 42, 999, -7]:
+		var grid: HexGrid = HexTopology.generate_hex(14, 10, {"seed": seed_value, "river_count": 2})
+		var topology := HexTopology.new(grid)
+		var origin := _primer_coord_pasable(grid)
+		var ours := GridSearch.find_reachable(topology, origin, 9.0)
+		var theirs := PathFinder.find_reachable(origin, 9.0, grid)
+		assert_int(ours.size()).is_equal(theirs.size())
+		for coord in theirs:
+			assert_float(float(ours[coord])).is_equal(float(theirs[coord]))
+
+
+func test_grid_search_igual_costo_optimo_que_anfitrion_en_path() -> void:
+	## El camino puede diferir en empates (inclusive en largo: 2 montañas a
+	## 3.0 cuestan lo mismo que 4 llanuras a 1.5), pero el costo acumulado del
+	## puerto debe igualar la distancia Dijkstra del anfitrión al destino y el
+	## camino ser válido: vecinos consecutivos y extremos correctos.
+	for seed_value in [0, 42]:
+		var grid: HexGrid = HexTopology.generate_hex(16, 12, {"seed": seed_value, "river_count": 3})
+		var topology := HexTopology.new(grid)
+		var origin := _primer_coord_pasable(grid)
+		var reachable := PathFinder.find_reachable(origin, 12.0, grid)
+		var destination: Vector2i
+		for coord in reachable:
+			destination = coord
+		var our_path := GridSearch.find_path(topology, origin, destination)
+		assert_int(our_path.size()).is_greater(1)
+		assert_vector(our_path[0]).is_equal(origin)
+		assert_vector(our_path[our_path.size() - 1]).is_equal(destination)
+		for i in our_path.size() - 1:
+			assert_int(topology.distance(our_path[i], our_path[i + 1])).is_equal(1)
+		assert_float(_costo_camino(topology, our_path)).is_equal(float(reachable[destination]))
+
+
+func _primer_coord_pasable(grid: HexGrid) -> Vector2i:
+	for coord in grid.get_all_cells():
+		if grid.is_passable(coord):
+			return coord
+	return Vector2i.ZERO
+
+
+func _costo_camino(topology: HexTopology, path: Array[Vector2i]) -> float:
+	var total := 0.0
+	for i in path.size() - 1:
+		total += topology.get_movement_cost(path[i + 1]) + topology.get_edge_cost(path[i], path[i + 1])
+	return total

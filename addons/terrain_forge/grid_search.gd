@@ -90,7 +90,7 @@ static func _search_path(topology: GridTopology, origin: Vector2i, target: Vecto
 	if topology == null or not topology.is_valid(origin) or origin == target:
 		return []
 	var reachable: Dictionary = params.get("reachable", {})
-	if reachable.is_empty() and (not topology.is_valid(target) or not topology.is_passable(target)):
+	if reachable.is_empty() and not _target_ok(topology, target, params):
 		return []
 	var cost_fn := _resolve_cost_fn(topology, params)
 	var neighbor_ok := _resolve_neighbor_filter(topology, params)
@@ -121,6 +121,18 @@ static func _priority(heuristic: Callable, coord: Vector2i, cost: float) -> floa
 	if heuristic.is_valid():
 		return cost + heuristic.call(coord)
 	return cost
+
+
+## El destino debe existir y ser transitable bajo el filtro vigente: un set
+## reachable ya codifica la pasabilidad; con passable_fn inyectada manda ella
+## (permite destinos que el puerto declara intransitables, p. ej. puentes).
+static func _target_ok(topology: GridTopology, target: Vector2i, params: Dictionary) -> bool:
+	if not topology.is_valid(target):
+		return false
+	var injected: Callable = params.get("passable_fn", Callable())
+	if injected.is_valid():
+		return injected.call(target)
+	return topology.is_passable(target)
 
 
 ## Modelo aditivo del puerto con clamp >= 0 (pesos negativos romperían el
