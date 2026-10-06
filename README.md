@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/JavierIslas/terrain-forge/actions/workflows/ci.yml/badge.svg)](https://github.com/JavierIslas/terrain-forge/actions/workflows/ci.yml)
 
-Procedural terrain generation for **Godot 4.6 / GDScript** with a **pluggable
+Procedural terrain generation for **Godot 4.7 / GDScript** with a **pluggable
 grid topology**: generate on **squares** (built-in, zero dependencies), on
 **hexagons** (via the FREE tier of
 [Hex Strategy Map](https://github.com/JavierIslas/hex-strategy-map-free)), or on
@@ -103,8 +103,8 @@ and a standalone squares demo).
 
 ## Testing
 
-Tests run under [gdUnit4](https://github.com/MikeSchulze/gdUnit4) in `test/unit/`
-(159 test cases, 13 suites):
+Tests run under [gdUnit4](https://github.com/godot-gdunit-labs/gdUnit4) in `test/unit/`
+(188 test cases, 14 suites):
 
 ```bash
 godot --headless --path . -s res://addons/gdUnit4/bin/GdUnitCmdTool.gd \
@@ -118,7 +118,7 @@ intentionally absent — parity uses an embedded reference.
 ### Continuous integration
 
 Every push to `main` and every pull request runs an editor pass (parse errors
-+ class cache) and the full gdUnit4 suite on Godot 4.6 headless, failing on
++ class cache) and the full gdUnit4 suite on Godot 4.7 headless, failing on
 zero collected tests (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 A scheduled job also runs weekly to watch the vendored hex fixture for

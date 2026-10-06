@@ -1,6 +1,6 @@
 # Terrain Forge
 
-Procedural terrain generation for **Godot 4.6 / GDScript** with pluggable grid
+Procedural terrain generation for **Godot 4.7 / GDScript** with pluggable grid
 topology: **squares** (built-in, no dependencies), **hexagons** (via the FREE
 tier of Hex Strategy Map), or any custom topology via the `GridTopology` port.
 
@@ -21,10 +21,10 @@ server.
 
 ## Facts
 
-- Version: 1.0.0 (Godot 4.6, GDScript; docs in English)
+- Version: 1.0.0 (Godot 4.7, GDScript; docs in English)
 - Nine injectable stages: elevation → moisture → falloff → classify → smooth → rivers → locations → roads → connectivity
 - ~40 documented parameters (seed, fBm, domain warp, island falloff, biome presets, rivers, locations, roads, connectivity)
-- 159 test cases across 13 suites, 0 failures; CI runs them headless on Godot 4.6
+- 188 test cases across 14 suites, 0 failures; CI runs them headless on Godot 4.7
 - Performance: 250×250 map (62,500 cells) full pipeline ≈ 2.6 s; interactive demo (26×16) regenerates in < 50 ms
 - Determinism: all randomness through seeded splitmix64 sub-streams; the global RNG is never touched — guarded by a regression test
 - Parity: with default terrain params, output is bit-for-bit identical to Hex Strategy Map's `MapGenerator` (test-frozen, negative seeds included)
