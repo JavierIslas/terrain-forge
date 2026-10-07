@@ -34,6 +34,10 @@ build_package() {
     # por class_name sin reasignarlas.
     cp -r "$ADDON_DIR" "$stage/addons/terrain_forge"
 
+    # El README viaja dentro del addon: Godot Asset Library espera la
+    # documentación junto al código, no en la raíz del zip.
+    cp "$REPO_ROOT/README.md" "$stage/addons/terrain_forge/README.md"
+
     # El código es dual-licensed y cada header .gd referencia ambos archivos, así
     # que los dos viajan siempre. El NOTICE indica cuál aplica a esta copia.
     cp "$REPO_ROOT/README.md"              "$stage/README.md"
